@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         StoryGraph Extra Menus - Dev
+// @name         StoryGraph Extra Menus
 // @namespace    selfdocumentingcode
 // @version      0.1
 // @description  Adds extra menus to StoryGraph pages
