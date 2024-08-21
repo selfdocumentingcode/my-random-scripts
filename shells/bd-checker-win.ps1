@@ -18,7 +18,7 @@
 # - PowerShell 7
 # - Windows
 #
-# Version: 0.3
+# Version: 0.4
 ###################################
 
 $betterDiscordDownloadUrl = "https://github.com/BetterDiscord/Installer/releases/latest/download/BetterDiscord-Windows.exe";
@@ -50,7 +50,9 @@ if (-not (Test-Path $discordIndexJsPath)) {
 
 function LaunchInBackground($path) {
     Write-Host $path;
-    Start-Process pwsh "-c Start-Process $path" -WindowStyle Hidden;
+    $res = Start-Process $path &;
+    #$res | Select-Object -Property *
+    Wait-Job -Id $res.Id
 }
 
 function LaunchAndWait($path) {
