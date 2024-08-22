@@ -10,29 +10,29 @@
 // @noframes
 // @grant        GM_addStyle
 // ==/UserScript==
-('use strict');
+("use strict");
 
-console.log('StoryGraph Extra Menus script running');
+console.log("StoryGraph Extra Menus script running");
 
-const turboLoadEvent = 'turbo:load';
+const turboLoadEvent = "turbo:load";
 
 // Default classes for desktop menu links
 const selectedLinkClassDesktop =
-  'inline-flex items-center px-1 pt-1 border-b-4 text-xs xl:text-sm font-body' +
-  'border-cyan-700 dark:border-cyan-500 text-cyan-700 dark:text-cyan-500 font-semibold';
+  "inline-flex items-center px-1 pt-1 border-b-4 text-xs xl:text-sm font-body" +
+  "border-cyan-700 dark:border-cyan-500 text-cyan-700 dark:text-cyan-500 font-semibold";
 const regularLinkClassDesktop =
-  'inline-flex items-center px-1 pt-1 border-b-4 text-xs xl:text-sm font-body ' +
-  'border-transparent text-darkestGrey dark:text-grey hover:border-cyan-700 dark:hover:border-cyan-500';
+  "inline-flex items-center px-1 pt-1 border-b-4 text-xs xl:text-sm font-body " +
+  "border-transparent text-darkestGrey dark:text-grey hover:border-cyan-700 dark:hover:border-cyan-500";
 
 // Adjust margin for desktop menu links to make space for new links
-const adjustMarginStyleDesktop = 'calc(32px*(1 - var(--tw-space-x-reverse)))!important';
-const adjustMarginClassDesktop = 'adjust-margin';
+const adjustMarginStyleDesktop = "calc(32px*(1 - var(--tw-space-x-reverse)))!important";
+const adjustMarginClassDesktop = "adjust-margin";
 const extraStyle = `@media (min-width:1280px) { .${adjustMarginClassDesktop} { margin-left: ${adjustMarginStyleDesktop}; } }`;
 
 // Make following links hidden on narrow screens (like Home link)
 const existingLinksClassAdjustments = [
-  { linkText: 'Community', classToRemove: 'inline-flex', classesToAdd: ['hidden', 'xl:inline-flex'] },
-  { linkText: 'Giveaways', classToRemove: 'inline-flex', classesToAdd: ['hidden', 'xl:inline-flex'] },
+  { linkText: "Community", classToRemove: "inline-flex", classesToAdd: ["hidden", "xl:inline-flex"] },
+  { linkText: "Giveaways", classToRemove: "inline-flex", classesToAdd: ["hidden", "xl:inline-flex"] },
 ];
 
 function main() {
@@ -41,31 +41,31 @@ function main() {
   const locationHref = window.location.href;
   const locationPath = `${window.location.pathname}${window.location.search}`;
 
-  let navbar = document.getElementById('navbar');
-  let menuDivDesktop = navbar.querySelector('div > div > div').children[1];
-  let linkElementsDesktop = menuDivDesktop.querySelectorAll('a');
+  let navbar = document.getElementById("navbar");
+  let menuDivDesktop = navbar.querySelector("div > div > div").children[1];
+  let linkElementsDesktop = menuDivDesktop.querySelectorAll("a");
 
   // Grab the profile name from the profile link in the mobile menu
-  const menuDivMobile = navbar.querySelector('#mobile-menu');
+  const menuDivMobile = navbar.querySelector("#mobile-menu");
   const profileLinkEl = menuDivMobile.querySelector("a[href*='/profile']");
-  const profileLinkValue = !!profileLinkEl?.href?.length ? profileLinkEl.href.split('/').pop() : null;
+  const profileLinkValue = !!profileLinkEl?.href?.length ? profileLinkEl.href.split("/").pop() : null;
 
   const newLinks = [
-    { text: 'Reading', href: `/currently-reading/${profileLinkValue}` },
-    { text: 'Read', href: `/books-read/${profileLinkValue}` },
-    { text: 'To-Read', href: `/to-read/${profileLinkValue}` },
+    { text: "Reading", href: `/currently-reading/${profileLinkValue}` },
+    { text: "Read", href: `/books-read/${profileLinkValue}` },
+    { text: "To-Read", href: `/to-read/${profileLinkValue}` },
   ];
 
   function handleLoadCompleted() {
-    navbar = document.getElementById('navbar');
-    menuDivDesktop = navbar.querySelector('div > div > div').children[1];
-    linkElementsDesktop = menuDivDesktop.querySelectorAll('a');
+    navbar = document.getElementById("navbar");
+    menuDivDesktop = navbar.querySelector("div > div > div").children[1];
+    linkElementsDesktop = menuDivDesktop.querySelectorAll("a");
 
     updateLinks();
   }
 
   function updateLinks() {
-    console.log('Adding links to menu');
+    console.log("Adding links to menu");
 
     const locationHref = window.location.href;
     const locationPath = `${window.location.pathname}${window.location.search}`;
@@ -76,7 +76,7 @@ function main() {
 
       if (existingLink) return;
 
-      const newLink = document.createElement('a');
+      const newLink = document.createElement("a");
       newLink.href = link.href;
       newLink.textContent = link.text;
 
@@ -115,5 +115,5 @@ function main() {
 try {
   main();
 } catch (error) {
-  window.alert('StoryGraph Extra Menus script error: ' + error.message);
+  window.alert("StoryGraph Extra Menus script error: " + error.message);
 }

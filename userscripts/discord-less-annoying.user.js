@@ -12,7 +12,7 @@
 (function () {
   "use strict";
 
-   /** Turn off reply ping */
+  /** Turn off reply ping */
   let channelTextAreaEl;
   let pingToggleEl;
 
@@ -33,21 +33,13 @@
 
       channelTextAreaEl.addEventListener("keydown", pingToggleHotkeyListener);
     } else {
-      channelTextAreaEl.removeEventListener(
-        "keydown",
-        pingToggleHotkeyListener
-      );
+      channelTextAreaEl.removeEventListener("keydown", pingToggleHotkeyListener);
     }
   });
 
   setInterval(() => {
-    const channelTextAreaElLocal = document.querySelector(
-      "div[class^=channelTextArea]"
-    );
-    if (
-      channelTextAreaElLocal &&
-      channelTextAreaElLocal !== channelTextAreaEl
-    ) {
+    const channelTextAreaElLocal = document.querySelector("div[class^=channelTextArea]");
+    if (channelTextAreaElLocal && channelTextAreaElLocal !== channelTextAreaEl) {
       channelTextAreaEl = channelTextAreaElLocal;
 
       pingReplyObserver.disconnect();
@@ -58,10 +50,9 @@
     }
   }, 1000);
 
-   /** Hide gift button */
-   const styleElement = document.createElement("style");
-   styleElement.textContent =
-     'button[aria-label="Send a gift"] { display: none }';
+  /** Hide gift button */
+  const styleElement = document.createElement("style");
+  styleElement.textContent = 'button[aria-label="Send a gift"] { display: none }';
 
-   document.head.appendChild(styleElement);
+  document.head.appendChild(styleElement);
 })();
