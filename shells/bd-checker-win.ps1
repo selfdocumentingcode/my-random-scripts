@@ -51,7 +51,6 @@ if (-not (Test-Path $discordIndexJsPath)) {
 function LaunchInBackground($path) {
     Write-Host $path;
     $res = Start-Process $path &;
-    #$res | Select-Object -Property *
     Wait-Job -Id $res.Id
 }
 
