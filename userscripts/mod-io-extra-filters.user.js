@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        mod.io extra filters
 // @namespace   selfdocumentingcode
-// @description Adds more filters to mod.io
+// @description Adds more filters to mod.io mod list pages
 // @version     0.1
 // @match       https://mod.io/g/*
 // @author      selfdocumentingcode
@@ -13,12 +13,12 @@
 // ==/UserScript==
 ("use strict");
 
-console.log("executing mod.io extra filters 4");
+console.log("Executing mod.io extra filters");
 
 // UI
 const filterMenuSelector = "div.filter-menu";
 
-const elementIdPrefix = "mfi";
+const elementIdPrefix = "mief";
 const openDialogBtnId = `${elementIdPrefix}-open-dialog-btn`;
 const dialogId = `${elementIdPrefix}-dialog`;
 const closeDialogBtnId = `${elementIdPrefix}-close-dialog-btn`;
@@ -26,6 +26,7 @@ const saveFiltersBtnId = `${elementIdPrefix}-save-filters-btn`;
 const cancelDialogBtnId = `${elementIdPrefix}-cancel-dialog-btn`;
 const filterByNameId = `${elementIdPrefix}-filter-by-name`;
 const filterByTextId = `${elementIdPrefix}-filter-by-text`;
+const ignoreModBtnClassName = `${elementIdPrefix}-ignore-mod-btn`;
 
 const openDialogBtnHtml = /*html*/ `
   <div class="tw-flex tw-justify-start tw-px-5 tw-pt-4">
@@ -56,35 +57,33 @@ const dialogHtml = dialogTemplate({
   openDialogBtnId,
 });
 
-let filterConfig = {
+const filterConfig = {
   filterByNameList: [],
   filterByTextList: [],
 };
+const filterByNameListKey = "filterByNameList";
+const filterByTextListKey = "filterByTextList";
 
 // Stores a reference to the mod list element.
 let modListElement;
 
 async function main() {
   // Load filter configuration from storage
-  filterConfig.filterByNameList = GM_getValue("filterByNameList", []);
-  filterConfig.filterByTextList = GM_getValue("filterByTextList", []);
+  filterConfig.filterByNameList = GM_getValue(filterByNameListKey, []);
+  filterConfig.filterByTextList = GM_getValue(filterByTextListKey, []);
 
   await initDialogUi();
 
   // There is no easy way to get the element that contains the mod items, so we
   // instead listen for any mod item to become visible and then grab its grandparent
-  var anyModItem = await waitForElement("a[href*='/g/'][href*='/m/']");
-
-  if (!anyModItem) {
-    console.error("no mod.io item found");
-    return;
-  }
+  let anyModItem = await waitForElement("a[href*='/g/'][href*='/m/']", -1); // wait indefinitely
 
   modListElement = anyModItem.parentElement.parentElement;
 
-  onElementChange(modListElement, filterElements);
-
-  console.log(anyModItem);
+  onElementChange(modListElement, () => {
+    filterElements();
+    addIgnoreButtons();
+  });
 }
 
 async function initDialogUi() {
@@ -159,17 +158,19 @@ function saveFilters() {
   filterConfig.filterByNameList = filterByNameList;
   filterConfig.filterByTextList = filterByTextList;
 
-  GM_setValue("filterByNameList", filterConfig.filterByNameList);
-  GM_setValue("filterByTextList", filterConfig.filterByTextList);
+  GM_setValue(filterByNameListKey, filterConfig.filterByNameList);
+  GM_setValue(filterByTextListKey, filterConfig.filterByTextList);
 
   closeDialog();
+
+  resetFilteredElements();
+  filterElements();
 }
 
 function onElementChange(element, callback) {
   callback(element);
 
   const observer = new MutationObserver((mutations) => {
-    console.log("element changed");
     callback(element);
   });
   observer.observe(element, { childList: true, subtree: true });
@@ -178,33 +179,23 @@ function onElementChange(element, callback) {
 }
 
 function filterElements() {
-  console.log("filtering elements");
-  console.log({ filterConfig });
-
-  var modElements = Array.from(modListElement.children).filter((modItem) => modItem.className.includes("tw-group"));
-
-  // console.log(modElements);
+  let modElements = Array.from(modListElement.children).filter((modItem) => modItem.className.includes("tw-group"));
 
   const filterByNameList = filterConfig.filterByNameList.map((x) => x.toLowerCase());
   const filterByTextList = filterConfig.filterByTextList.map((x) => x.toLowerCase());
 
-  for (var i = 0; i < modElements.length; i++) {
-    var modItem = modElements[i];
+  for (let i = 0; i < modElements.length; i++) {
+    let modItem = modElements[i];
 
-    // console.log(modItem);
-
-    var modLink = modItem.querySelector("a:first-child").href;
-    var modName = modLink.substring(modLink.lastIndexOf("/") + 1).toLowerCase();
-
-    // console.log({ modLink, modName });
+    let modLink = modItem.querySelector("a:first-child").href;
+    let modName = modLink.substring(modLink.lastIndexOf("/") + 1).toLowerCase();
 
     if (filterByNameList.some((filter) => modName === filter)) {
       modItem.style.display = "none";
       continue;
     }
 
-    var title = modItem.querySelector("a > div:nth-child(2) > span").textContent.toLowerCase();
-    console.log({ title });
+    let title = modItem.querySelector("a > div:nth-child(2) > span").textContent.toLowerCase();
 
     if (filterByTextList.some((filter) => title.includes(filter))) {
       modItem.style.display = "none";
@@ -212,6 +203,63 @@ function filterElements() {
   }
 }
 
+function resetFilteredElements() {
+  let modElements = Array.from(modListElement.children).filter((modItem) => modItem.className.includes("tw-group"));
+  for (let i = 0; i < modElements.length; i++) {
+    let modItem = modElements[i];
+    modItem.style.display = "";
+  }
+}
+
+function addIgnoreButtons() {
+  let visibleModELements = Array.from(modListElement.children).filter(
+    (modItem) => modItem.className.includes("tw-group") && modItem.style.display !== "none"
+  );
+
+  for (let i = 0; i < visibleModELements.length; i++) {
+    let modItem = visibleModELements[i];
+
+    let hasIgnoreBtn = modItem.querySelector(`button.${ignoreModBtnClassName}`);
+    if (hasIgnoreBtn) {
+      continue;
+    }
+
+    let modLink = modItem.querySelector("a:first-child").href;
+    let modName = modLink.substring(modLink.lastIndexOf("/") + 1).toLowerCase();
+
+    let ignoreModBtn = document.createElement("button");
+    ignoreModBtn.type = "button";
+    ignoreModBtn.className =
+      ignoreModBtnClassName +
+      " tw-absolute tw-top-0 tw-right-0" +
+      " tw-dark tw-bg-theme-1 tw-text-theme tw-border-theme-1 tw-p-1" +
+      " tw-button-transition tw-outline-none hover:tw-text-danger focus:tw-text-danger";
+    ignoreModBtn.style.borderBottomLeftRadius = "25%";
+    ignoreModBtn.innerHTML = /*html*/ `
+      ${closeIconSvgTemplate()}
+      <span class="sr-only">Close modal</span>
+      `;
+    ignoreModBtn.addEventListener("click", (evt) => {
+      evt.stopPropagation();
+
+      modItem.style.display = "none";
+
+      filterConfig.filterByNameList.push(modName);
+      GM_setValue(filterByNameListKey, filterConfig.filterByNameList);
+    });
+    modItem.appendChild(ignoreModBtn);
+  }
+}
+
+/**
+ * Waits for an element to be present in the DOM.
+ *
+ * @param {string} selector - The CSS selector of the element to wait for.
+ * @param {number} [timeout=10000] - The maximum time in milliseconds to wait for the element.
+ *  A negative value means no timeout.
+ * @return {Promise<Element>} A promise that resolves with the element when it is present in the DOM,
+ *  and rejects if the timeout is exceeded
+ */
 function waitForElement(selector, timeout = 10000) {
   return new Promise((resolve, reject) => {
     if (document.querySelector(selector)) {
@@ -230,10 +278,12 @@ function waitForElement(selector, timeout = 10000) {
       subtree: true,
     });
 
-    setTimeout(() => {
-      observer.disconnect();
-      reject(new Error(`Timeout waiting for element: ${selector}`));
-    }, timeout);
+    if (timeout > 0) {
+      setTimeout(() => {
+        observer.disconnect();
+        reject(new Error(`Timeout waiting for element: ${selector}`));
+      }, timeout);
+    }
   });
 }
 
@@ -282,7 +332,7 @@ function dialogTemplate(props) {
               <!-- close button -->
               <button
                 id="${closeDialogBtnId}"
-                class="tw-absolute tw--top-9 tw-right-0 tw-flex tw-items-center tw-justify-center tw-overflow-hidden tw-button-transition tw-outline-none tw-shrink-0 tw-space-x-2 tw-font-bold hover:tw-text-primary focus:tw-text-primary tw-text-sm tw-cursor-pointer tw-input--height-small tw-input--width-small tw-absolute tw--top-9 tw-right-0"
+                class="tw-absolute tw--top-9 tw-right-0 tw-flex tw-items-center tw-justify-center tw-overflow-hidden tw-button-transition tw-outline-none tw-shrink-0 tw-space-x-2 tw-font-bold hover:tw-text-primary focus:tw-text-primary tw-text-sm tw-cursor-pointer tw-input--height-small tw-input--width-small"
                 tabindex="0"
               >
               ${closeIconSvgTemplate()}
