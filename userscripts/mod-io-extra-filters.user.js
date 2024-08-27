@@ -1,20 +1,19 @@
 // ==UserScript==
-// @name        mod.io drg filters
+// @name        mod.io extra filters
 // @namespace   selfdocumentingcode
-// @description Adds more filters to mod.io/g/drg
+// @description Adds more filters to mod.io
 // @version     0.1
-// @match       https://mod.io/g/drg*
+// @match       https://mod.io/g/*
 // @author      selfdocumentingcode
 // @icon        https://www.google.com/s2/favicons?sz=64&domain=mod.io
 // @license     MIT
 // @noframes
-// @grant       none
+// @grant       GM_getValue
+// @grant       GM_setValue
 // ==/UserScript==
 ("use strict");
 
-console.log("executing mod.io drg filters 3");
-
-const titleFilters = ["blue archive"];
+console.log("executing mod.io extra filters 4");
 
 // UI
 const filterMenuSelector = "div.filter-menu";
@@ -23,6 +22,8 @@ const elementIdPrefix = "mfi";
 const openDialogBtnId = `${elementIdPrefix}-open-dialog-btn`;
 const dialogId = `${elementIdPrefix}-dialog`;
 const closeDialogBtnId = `${elementIdPrefix}-close-dialog-btn`;
+const saveFiltersBtnId = `${elementIdPrefix}-save-filters-btn`;
+const cancelDialogBtnId = `${elementIdPrefix}-cancel-dialog-btn`;
 const filterByNameId = `${elementIdPrefix}-filter-by-name`;
 const filterByTextId = `${elementIdPrefix}-filter-by-text`;
 
@@ -55,51 +56,113 @@ const dialogHtml = dialogTemplate({
   openDialogBtnId,
 });
 
-async function main() {
-  await initUI();
+let filterConfig = {
+  filterByNameList: [],
+  filterByTextList: [],
+};
 
-  return;
-  var anyModItem = await waitForElement("a[href*='/g/drg/m/'");
+// Stores a reference to the mod list element.
+let modListElement;
+
+async function main() {
+  // Load filter configuration from storage
+  filterConfig.filterByNameList = GM_getValue("filterByNameList", []);
+  filterConfig.filterByTextList = GM_getValue("filterByTextList", []);
+
+  await initDialogUi();
+
+  // There is no easy way to get the element that contains the mod items, so we
+  // instead listen for any mod item to become visible and then grab its grandparent
+  var anyModItem = await waitForElement("a[href*='/g/'][href*='/m/']");
 
   if (!anyModItem) {
     console.error("no mod.io item found");
     return;
   }
 
-  var modListEl = anyModItem.parentElement.parentElement;
+  modListElement = anyModItem.parentElement.parentElement;
 
-  // console.log(modListEl);
-
-  onElementChange(modListEl, filterElements);
-
-  // filterElements(modListEl);
+  onElementChange(modListElement, filterElements);
 
   console.log(anyModItem);
 }
 
-async function initUI() {
+async function initDialogUi() {
   // Insert dialog html in body
   document.body.insertAdjacentHTML("beforeend", dialogHtml);
 
   const filterMenuEl = await waitForElement(filterMenuSelector);
-  console.log(filterMenuEl);
 
   const filterMenuInnerEl = filterMenuEl.children[0];
-  console.log(filterMenuInnerEl);
 
   filterMenuInnerEl.insertAdjacentHTML("afterbegin", openDialogBtnHtml);
 
+  // Hook up event listeners
   const extraFiltersBtn = document.getElementById(openDialogBtnId);
-  console.log(extraFiltersBtn);
-
-  // Debug dialog
-  setTimeout(() => {
-    document.getElementById(dialogId).showModal();
-  }, 100);
 
   extraFiltersBtn.addEventListener("click", () => {
-    document.getElementById(dialogId).showModal();
+    openDialog();
   });
+
+  const saveFiltersBtn = document.getElementById(saveFiltersBtnId);
+  saveFiltersBtn.addEventListener("click", () => {
+    saveFilters();
+  });
+
+  const cancelDialogBtn = document.getElementById(cancelDialogBtnId);
+  cancelDialogBtn.addEventListener("click", () => {
+    closeDialog();
+  });
+
+  const closeDialogBtn = document.getElementById(closeDialogBtnId);
+  closeDialogBtn.addEventListener("click", () => {
+    closeDialog();
+  });
+
+  // Debug dialog
+  // setTimeout(() => {
+  //   openDialog();
+  // }, 100);
+}
+
+function openDialog() {
+  // build string values by joining each list
+  const { filterByNameList, filterByTextList } = filterConfig;
+  const filterByName = filterByNameList.join("\n");
+  const filterByText = filterByTextList.join("\n");
+
+  // populate filter textareas
+  document.getElementById(filterByNameId).value = filterByName;
+  document.getElementById(filterByTextId).value = filterByText;
+
+  document.getElementById(dialogId).showModal();
+}
+
+function closeDialog() {
+  document.getElementById(dialogId).close();
+}
+
+function saveFilters() {
+  const filterByNameList = document
+    .getElementById(filterByNameId)
+    .value.split("\n")
+    .map((x) => x.trim())
+    .filter((x) => x.length > 0);
+
+  const filterByTextList = document
+    .getElementById(filterByTextId)
+    .value.split("\n")
+    .map((x) => x.trim())
+    .filter((x) => x.length > 0);
+  console.log({ filterByNameList, filterByTextList });
+
+  filterConfig.filterByNameList = filterByNameList;
+  filterConfig.filterByTextList = filterByTextList;
+
+  GM_setValue("filterByNameList", filterConfig.filterByNameList);
+  GM_setValue("filterByTextList", filterConfig.filterByTextList);
+
+  closeDialog();
 }
 
 function onElementChange(element, callback) {
@@ -114,21 +177,36 @@ function onElementChange(element, callback) {
   return observer;
 }
 
-function filterElements(modListEl) {
+function filterElements() {
   console.log("filtering elements");
+  console.log({ filterConfig });
 
-  var modElements = Array.from(modListEl.children).filter((modItem) => modItem.className.includes("tw-group"));
+  var modElements = Array.from(modListElement.children).filter((modItem) => modItem.className.includes("tw-group"));
 
   // console.log(modElements);
+
+  const filterByNameList = filterConfig.filterByNameList.map((x) => x.toLowerCase());
+  const filterByTextList = filterConfig.filterByTextList.map((x) => x.toLowerCase());
 
   for (var i = 0; i < modElements.length; i++) {
     var modItem = modElements[i];
 
     // console.log(modItem);
 
-    var title = modItem.querySelector("a > div:nth-child(2) > span").textContent;
+    var modLink = modItem.querySelector("a:first-child").href;
+    var modName = modLink.substring(modLink.lastIndexOf("/") + 1).toLowerCase();
 
-    if (titleFilters.some((filter) => title.toLowerCase().includes(filter))) {
+    // console.log({ modLink, modName });
+
+    if (filterByNameList.some((filter) => modName === filter)) {
+      modItem.style.display = "none";
+      continue;
+    }
+
+    var title = modItem.querySelector("a > div:nth-child(2) > span").textContent.toLowerCase();
+    console.log({ title });
+
+    if (filterByTextList.some((filter) => title.includes(filter))) {
       modItem.style.display = "none";
     }
   }
@@ -162,12 +240,12 @@ function waitForElement(selector, timeout = 10000) {
 try {
   main();
 } catch (error) {
-  window.alert("mod.io drg filters script error: " + error.message);
+  window.alert("mod.io extra filters script error: " + error.message);
 }
 
 /******************************************************************************************************
  * UI Templates
- * Based on existing elements on mod.io/r/drg
+ * Based on existing elements on mod.io/r/extra
  * The extra filters dialog template's structure and tailwind class soup are copied from the Report dialog
  *****************************************************************************************************/
 
@@ -222,6 +300,7 @@ function dialogTemplate(props) {
                 <div class="tw-w-full tw-flex tw-justify-between tw-items-center">
                   <div class="tw-flex tw-flex-col sm:tw-flex-row tw-items-center tw-w-full tw-gap-3">
                     <button
+                      id="${cancelDialogBtnId}"
                       type="button"
                       class="tw-flex tw-items-center tw-justify-center tw-overflow-hidden tw-button-transition tw-outline-none tw-shrink-0 tw-space-x-2 tw-font-bold tw-text-md tw-leading-normal tw-global--border-radius tw-cursor-pointer tw-input--height-large tw-w-full sm:tw-w-36 tw-bg-theme-1 tw-text-theme tw-border-theme-1 hover:tw-bg-theme-2 focus:tw-bg-theme-1 hover:tw-border-theme-2 focus:tw-border-theme-2 tw-border-2"
                       tabindex="0"
@@ -229,6 +308,7 @@ function dialogTemplate(props) {
                       <span class="tw-transform tw-transition-transform tw-translate-x-0"> Cancel </span>
                     </button>
                     <button
+                      id="${saveFiltersBtnId}"
                       type="button"
                       class="tw-flex tw-items-center tw-justify-center tw-overflow-hidden tw-button-transition tw-outline-none tw-shrink-0 tw-space-x-2 tw-font-bold tw-text-md tw-leading-normal tw-global--border-radius tw-cursor-pointer tw-input--height-large tw-w-full sm:tw-w-36 tw-bg-primary tw-text-primary-text tw-border-primary hover:tw-bg-primary-hover focus:tw-bg-primary-hover hover:tw-border-primary-hover focus:tw-border-primary-hover tw-border-2"
                       tabindex="0"
@@ -258,7 +338,7 @@ function textareaTemplate(elementId, labelText) {
         id="${elementId}"
         placeholder="1 per line"
         cols="30"
-        rows="3"
+        rows="10"
         tabindex="0"
         class="tw-flex tw-input--p tw-resize-y tw-min-h-18 tw-global--border-radius tw-transition-colors tw-ease-in-out tw-bg-input-group-hover tw-input--text-size tw-leading-normal tw-outline-none tw-appearance-none tw-w-full tw-input--focus"
         value=""
