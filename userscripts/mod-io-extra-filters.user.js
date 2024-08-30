@@ -24,8 +24,9 @@ const dialogId = `${elementIdPrefix}-dialog`;
 const closeDialogBtnId = `${elementIdPrefix}-close-dialog-btn`;
 const saveFiltersBtnId = `${elementIdPrefix}-save-filters-btn`;
 const cancelDialogBtnId = `${elementIdPrefix}-cancel-dialog-btn`;
-const filterByNameId = `${elementIdPrefix}-filter-by-name`;
-const filterByTextId = `${elementIdPrefix}-filter-by-text`;
+const minDownloadsId = `${elementIdPrefix}-min-downloads`;
+const ignoreByNameId = `${elementIdPrefix}-filter-by-name`;
+const ignoreByTextId = `${elementIdPrefix}-filter-by-text`;
 const ignoreModBtnClassName = `${elementIdPrefix}-ignore-mod-btn`;
 
 const openDialogBtnHtml = /*html*/ `
@@ -44,8 +45,9 @@ const dialogTitleTxt = "Extra filters";
 const dialogBodyHtml = /*html*/ `
   <form method="dialog">
     <div class="tw-flex tw-flex-col tw-space-y-4">
-      ${textareaTemplate(filterByNameId, "Filter by mod name (full match)")}
-      ${textareaTemplate(filterByTextId, "Filter by mod title or description (partial match)")}
+      ${textInputTemplate(minDownloadsId, "number", "Minimum number of downloads")}
+      ${textareaTemplate(ignoreByNameId, "Ignore by mod name (full match)")}
+      ${textareaTemplate(ignoreByTextId, "Ignore by mod title or description (partial match)")}
     </div>
   </form>
 `;
@@ -58,19 +60,23 @@ const dialogHtml = dialogTemplate({
 });
 
 const filterConfig = {
-  filterByNameList: [],
-  filterByTextList: [],
+  minDownloads: 0,
+  ignoreByNameList: [],
+  ignoreByTextList: [],
 };
-const filterByNameListKey = "filterByNameList";
-const filterByTextListKey = "filterByTextList";
+
+const minDownloadsKey = "minDownloads";
+const ignoreByNameListKey = "ignoreByNameList";
+const ignoreByTextListKey = "ignoreByTextList";
 
 // Stores a reference to the mod list element.
 let modListElement;
 
 async function main() {
   // Load filter configuration from storage
-  filterConfig.filterByNameList = GM_getValue(filterByNameListKey, []);
-  filterConfig.filterByTextList = GM_getValue(filterByTextListKey, []);
+  filterConfig.minDownloads = GM_getValue(minDownloadsKey, 0);
+  filterConfig.ignoreByNameList = GM_getValue(ignoreByNameListKey, []);
+  filterConfig.ignoreByTextList = GM_getValue(ignoreByTextListKey, []);
 
   await initDialogUi();
 
@@ -126,13 +132,14 @@ async function initDialogUi() {
 
 function openDialog() {
   // build string values by joining each list
-  const { filterByNameList, filterByTextList } = filterConfig;
-  const filterByName = filterByNameList.join("\n");
-  const filterByText = filterByTextList.join("\n");
+  const { minDownloads, ignoreByNameList, ignoreByTextList } = filterConfig;
+  const ignoreByName = ignoreByNameList.join("\n");
+  const ignoreByText = ignoreByTextList.join("\n");
 
   // populate filter textareas
-  document.getElementById(filterByNameId).value = filterByName;
-  document.getElementById(filterByTextId).value = filterByText;
+  document.getElementById(minDownloadsId).value = minDownloads;
+  document.getElementById(ignoreByNameId).value = ignoreByName;
+  document.getElementById(ignoreByTextId).value = ignoreByText;
 
   document.getElementById(dialogId).showModal();
 }
@@ -142,24 +149,28 @@ function closeDialog() {
 }
 
 function saveFilters() {
-  const filterByNameList = document
-    .getElementById(filterByNameId)
+  const minDownloadsString = document.getElementById(minDownloadsId).value;
+  const minDownloads = minDownloadsString !== "" ? minDownloadsString : "0";
+
+  const ignoreByNameList = document
+    .getElementById(ignoreByNameId)
     .value.split("\n")
     .map((x) => x.trim())
     .filter((x) => x.length > 0);
 
-  const filterByTextList = document
-    .getElementById(filterByTextId)
+  const ignoreByTextList = document
+    .getElementById(ignoreByTextId)
     .value.split("\n")
     .map((x) => x.trim())
     .filter((x) => x.length > 0);
-  console.log({ filterByNameList, filterByTextList });
 
-  filterConfig.filterByNameList = filterByNameList;
-  filterConfig.filterByTextList = filterByTextList;
+  filterConfig.minDownloads = minDownloads;
+  filterConfig.ignoreByNameList = ignoreByNameList;
+  filterConfig.ignoreByTextList = ignoreByTextList;
 
-  GM_setValue(filterByNameListKey, filterConfig.filterByNameList);
-  GM_setValue(filterByTextListKey, filterConfig.filterByTextList);
+  GM_setValue(minDownloadsKey, filterConfig.minDownloads);
+  GM_setValue(ignoreByNameListKey, filterConfig.ignoreByNameList);
+  GM_setValue(ignoreByTextListKey, filterConfig.ignoreByTextList);
 
   closeDialog();
 
@@ -181,23 +192,32 @@ function onElementChange(element, callback) {
 function filterElements() {
   let modElements = Array.from(modListElement.children).filter((modItem) => modItem.className.includes("tw-group"));
 
-  const filterByNameList = filterConfig.filterByNameList.map((x) => x.toLowerCase());
-  const filterByTextList = filterConfig.filterByTextList.map((x) => x.toLowerCase());
+  const minDownloads = parseInt(filterConfig.minDownloads);
+  const ignoreByNameList = filterConfig.ignoreByNameList.map((x) => x.toLowerCase());
+  const ignoreByTextList = filterConfig.ignoreByTextList.map((x) => x.toLowerCase());
 
   for (let i = 0; i < modElements.length; i++) {
     let modItem = modElements[i];
 
+    let downloadsIconEl = modItem.querySelector("svg.fa-cloud-download-alt");
+    let downloadsSpan = downloadsIconEl.nextSibling;
+    let downloadsCount = parseInt(downloadsSpan.textContent.replace("K", "000"));
+    if (downloadsCount < minDownloads) {
+      modItem.style.display = "none";
+      continue;
+    }
+
     let modLink = modItem.querySelector("a:first-child").href;
     let modName = modLink.substring(modLink.lastIndexOf("/") + 1).toLowerCase();
 
-    if (filterByNameList.some((filter) => modName === filter)) {
+    if (ignoreByNameList.some((filter) => modName === filter)) {
       modItem.style.display = "none";
       continue;
     }
 
     let title = modItem.querySelector("a > div:nth-child(2) > span").textContent.toLowerCase();
 
-    if (filterByTextList.some((filter) => title.includes(filter))) {
+    if (ignoreByTextList.some((filter) => title.includes(filter))) {
       modItem.style.display = "none";
     }
   }
@@ -244,8 +264,8 @@ function addIgnoreButtons() {
 
       modItem.style.display = "none";
 
-      filterConfig.filterByNameList.push(modName);
-      GM_setValue(filterByNameListKey, filterConfig.filterByNameList);
+      filterConfig.ignoreByNameList.push(modName);
+      GM_setValue(ignoreByNameListKey, filterConfig.ignoreByNameList);
     });
     modItem.appendChild(ignoreModBtn);
   }
@@ -373,6 +393,23 @@ function dialogTemplate(props) {
         </div>
       </div>
     </dialog>
+  `;
+}
+
+function textInputTemplate(elementId, inputType, labelText) {
+  return /*html*/ `
+  <div class="tw-text-theme tw-block tw-w-full">
+    <div class="tw-flex tw-label-gap">
+      <label class="tw-flex tw-flex-wrap sm:tw-items-center tw-w-full tw-justify-between" for="${elementId}">
+        <span class="tw-text-md tw-opacity-70">${labelText}</span>
+      </label>
+    </div>
+    <div class="tw-group">
+      <div class="tw-flex tw-overflow-hidden tw-relative tw-global--border-radius tw-button-transition tw-w-full tw-input--focus-within tw-bg-input-hover tw-input--height-large tw-input--text-size">
+        <input id="${elementId}" type="${inputType}" tabindex="0" class="tw-flex tw-h-full tw-bg-transparent tw-placeholder-input tw-leading-normal tw-outline-none tw-appearance-none tw-w-full tw-global--border-radius-l tw-input--pl tw-global--border-radius-r tw-input--pr">
+      </div>
+    </div>
+  </div>
   `;
 }
 
