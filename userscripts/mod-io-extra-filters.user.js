@@ -2,7 +2,7 @@
 // @name        mod.io extra filters
 // @namespace   selfdocumentingcode
 // @description Adds more filters to mod.io mod list pages
-// @version     0.1
+// @version     0.2
 // @match       https://mod.io/*
 // @author      selfdocumentingcode
 // @icon        https://www.google.com/s2/favicons?sz=64&domain=mod.io
@@ -15,8 +15,17 @@
 
 console.log("Executing mod.io extra filters");
 
-const filterMenuSelector = "div.filter-menu";
 const modItemLinkSelector = "a[href*='/g/'][href*='/m/']";
+const filterMenuSelector = "div.filter-menu";
+
+// ':' symbols in class names have to be escaped with '\'
+// class name starting with a digit get their first digit escaped by replacing it with its unicode representation
+// e.g. '.2xl' => '\32xl' where '\32' is the unicode character 'U+0032'.
+// Finally, all '\' have to be escaped with a '\' in the js string.
+const modListSelector =
+  "div.tw-grid.tw-flex-wrap.tw-grid-cols-2.md\\:tw-grid-cols-3.lg\\:tw-grid-cols-2.xl\\:tw-grid-cols-3" +
+  ".\\32xl\\:tw-grid-cols-4.\\33xl\\:tw-grid-cols-5.\\34xl\\:tw-grid-cols-6.\\35xl\\:tw-grid-cols-7" +
+  `:has(${modItemLinkSelector})`;
 
 const elementIdPrefix = "mief";
 const openDialogBtnId = `${elementIdPrefix}-open-dialog-btn`;
@@ -132,14 +141,7 @@ async function initFiltersPage(abortSignal) {
   const openDialogBtnEl = document.getElementById(openDialogBtnId);
   openDialogBtnEl.addEventListener("click", openDialog, { signal: abortSignal });
 
-  // There is no easy way to get the element that contains the mod items, so we
-  // instead listen for any mod item to become visible and then grab its grandparent
-  const anyModItem = await waitForElement(modItemLinkSelector, abortSignal, indefiniteWait);
-  console.log("anyModItem", anyModItem);
-  console.log("anyModeItem.parentElement", anyModItem.parentElement);
-  console.log("anyModeItem.parentElement.parentElement", anyModItem.parentElement.parentElement);
-
-  modListElement = anyModItem.parentElement.parentElement;
+  modListElement = await waitForElement(modListSelector, abortSignal, indefiniteWait);
 
   const observer = onElementChange(
     modListElement,
