@@ -3,7 +3,7 @@
 // @namespace   selfdocumentingcode
 // @description Adds more filters to mod.io mod list pages
 // @version     0.1
-// @match       https://mod.io/g/*
+// @match       https://mod.io/*
 // @author      selfdocumentingcode
 // @icon        https://www.google.com/s2/favicons?sz=64&domain=mod.io
 // @license     MIT
@@ -15,8 +15,8 @@
 
 console.log("Executing mod.io extra filters");
 
-// UI
 const filterMenuSelector = "div.filter-menu";
+const modItemLinkSelector = "a[href*='/g/'][href*='/m/']";
 
 const elementIdPrefix = "mief";
 const openDialogBtnId = `${elementIdPrefix}-open-dialog-btn`;
@@ -29,35 +29,12 @@ const ignoreByNameId = `${elementIdPrefix}-filter-by-name`;
 const ignoreByTextId = `${elementIdPrefix}-filter-by-text`;
 const ignoreModBtnClassName = `${elementIdPrefix}-ignore-mod-btn`;
 
-const openDialogBtnHtml = /*html*/ `
-  <div class="tw-flex tw-justify-start tw-px-5 tw-pt-4">
-    <button
-      id="${openDialogBtnId}"
-      type="button"
-      class="tw-grow tw-bg-primary tw-border-primary tw-border-2 tw-p-2 tw-global--border-radius tw-text-primary-text tw-text-md tw-font-bold"
-    >
-      Extra filters
-    </button>
-  </div>
-`;
-
 const dialogTitleTxt = "Extra filters";
-const dialogBodyHtml = /*html*/ `
-  <form method="dialog">
-    <div class="tw-flex tw-flex-col tw-space-y-4">
-      ${textInputTemplate(minDownloadsId, "number", "Minimum number of downloads")}
-      ${textareaTemplate(ignoreByNameId, "Ignore by mod name (full match)")}
-      ${textareaTemplate(ignoreByTextId, "Ignore by mod title or description (partial match)")}
-    </div>
-  </form>
-`;
+const extraFiltersBtnTxt = "Extra filters";
 
-const dialogHtml = dialogTemplate({
-  title: dialogTitleTxt,
-  body: dialogBodyHtml,
-  dialogId,
-  openDialogBtnId,
-});
+// Should only match the path for mod.io/g/nameofgame with or without the trailing slash
+// iT should not match mod.io/g/nameofgame/anysubpaths
+const filtersPageUrlRegex = /\/g\/[^\/]+$/gm;
 
 const filterConfig = {
   minDownloads: 0,
@@ -69,8 +46,8 @@ const minDownloadsKey = "minDownloads";
 const ignoreByNameListKey = "ignoreByNameList";
 const ignoreByTextListKey = "ignoreByTextList";
 
-// Stores a reference to the mod list element.
 let modListElement;
+let filtersPageAbortController;
 
 async function main() {
   // Load filter configuration from storage
@@ -80,54 +57,100 @@ async function main() {
 
   await initDialogUi();
 
-  // There is no easy way to get the element that contains the mod items, so we
-  // instead listen for any mod item to become visible and then grab its grandparent
-  let anyModItem = await waitForElement("a[href*='/g/'][href*='/m/']", -1); // wait indefinitely
+  let prevPath = window.location.pathname;
+  new MutationObserver(() => {
+    const currentPath = window.location.pathname;
+    if (prevPath == currentPath) return;
 
-  modListElement = anyModItem.parentElement.parentElement;
-
-  onElementChange(modListElement, () => {
-    filterElements();
-    addIgnoreButtons();
+    prevPath = currentPath;
+    onUrlChange();
+  }).observe(document, {
+    subtree: true,
+    childList: true,
   });
+
+  onUrlChange();
+}
+
+async function onUrlChange() {
+  console.log("onUrlChange", window.location.pathname);
+  if (!window.location.pathname.match(filtersPageUrlRegex)) {
+    console.log("Path does not match");
+
+    if (filtersPageAbortController) {
+      console.log("Disconnecting filtersPageObserver");
+      filtersPageAbortController.abort();
+      filtersPageAbortController = null;
+    }
+
+    return;
+  }
+
+  console.log("Match. Connecting filtersPageObserver");
+  filtersPageAbortController = new AbortController();
+  const signal = filtersPageAbortController.signal;
+
+  await initFiltersPage(signal);
 }
 
 async function initDialogUi() {
   // Insert dialog html in body
+  const dialogHtml = dialogTemplate({
+    title: dialogTitleTxt,
+    body: dialogBodyTemplate(),
+    dialogId,
+    openDialogBtnId,
+  });
+
   document.body.insertAdjacentHTML("beforeend", dialogHtml);
 
-  const filterMenuEl = await waitForElement(filterMenuSelector);
-
-  const filterMenuInnerEl = filterMenuEl.children[0];
-
-  filterMenuInnerEl.insertAdjacentHTML("afterbegin", openDialogBtnHtml);
-
-  // Hook up event listeners
-  const extraFiltersBtn = document.getElementById(openDialogBtnId);
-
-  extraFiltersBtn.addEventListener("click", () => {
-    openDialog();
-  });
-
+  // Hook up dialog buttons events
   const saveFiltersBtn = document.getElementById(saveFiltersBtnId);
-  saveFiltersBtn.addEventListener("click", () => {
-    saveFilters();
-  });
+  saveFiltersBtn.addEventListener("click", saveFilters);
 
   const cancelDialogBtn = document.getElementById(cancelDialogBtnId);
-  cancelDialogBtn.addEventListener("click", () => {
-    closeDialog();
-  });
+  cancelDialogBtn.addEventListener("click", closeDialog);
 
   const closeDialogBtn = document.getElementById(closeDialogBtnId);
-  closeDialogBtn.addEventListener("click", () => {
-    closeDialog();
-  });
+  closeDialogBtn.addEventListener("click", closeDialog);
 
   // Debug dialog
   // setTimeout(() => {
   //   openDialog();
   // }, 100);
+}
+
+async function initFiltersPage(abortSignal) {
+  const indefiniteWait = -1;
+
+  const filterMenuEl = await waitForElement(filterMenuSelector, abortSignal, indefiniteWait);
+
+  // Insert the open dialog button
+  const filterMenuInnerEl = filterMenuEl.children[0];
+  filterMenuInnerEl.insertAdjacentHTML("afterbegin", openDialogBtnTemplate());
+
+  const openDialogBtnEl = document.getElementById(openDialogBtnId);
+  openDialogBtnEl.addEventListener("click", openDialog, { signal: abortSignal });
+
+  // There is no easy way to get the element that contains the mod items, so we
+  // instead listen for any mod item to become visible and then grab its grandparent
+  const anyModItem = await waitForElement(modItemLinkSelector, abortSignal, indefiniteWait);
+  console.log("anyModItem", anyModItem);
+  console.log("anyModeItem.parentElement", anyModItem.parentElement);
+  console.log("anyModeItem.parentElement.parentElement", anyModItem.parentElement.parentElement);
+
+  modListElement = anyModItem.parentElement.parentElement;
+
+  const observer = onElementChange(
+    modListElement,
+    () => {
+      filterElements();
+      addIgnoreButtons();
+    },
+    abortSignal
+  );
+
+  return observer;
 }
 
 function openDialog() {
@@ -176,17 +199,6 @@ function saveFilters() {
 
   resetFilteredElements();
   filterElements();
-}
-
-function onElementChange(element, callback) {
-  callback(element);
-
-  const observer = new MutationObserver((mutations) => {
-    callback(element);
-  });
-  observer.observe(element, { childList: true, subtree: true });
-
-  return observer;
 }
 
 function filterElements() {
@@ -277,10 +289,11 @@ function addIgnoreButtons() {
  * @param {string} selector - The CSS selector of the element to wait for.
  * @param {number} [timeout=10000] - The maximum time in milliseconds to wait for the element.
  *  A negative value means no timeout.
+ * @param {AbortSignal} abortSignal - The signal to listen for to stop waiting.
  * @return {Promise<Element>} A promise that resolves with the element when it is present in the DOM,
- *  and rejects if the timeout is exceeded
+ *  and rejects if the timeout is exceeded, or if the abort signal is triggered.
  */
-function waitForElement(selector, timeout = 10000) {
+function waitForElement(selector, abortSignal, timeout = 10000) {
   return new Promise((resolve, reject) => {
     if (document.querySelector(selector)) {
       return resolve(document.querySelector(selector));
@@ -297,14 +310,52 @@ function waitForElement(selector, timeout = 10000) {
       childList: true,
       subtree: true,
     });
+    console.log("Observing for element: " + selector);
+
+    abortSignal.addEventListener(
+      "abort",
+      () => {
+        console.log("Aborted waiting for element: " + selector);
+        observer.disconnect();
+        reject(new Error(`Aborted waiting for element: ${selector}`));
+      },
+      { once: true }
+    );
 
     if (timeout > 0) {
       setTimeout(() => {
+        console.log("Timeout waiting for element: " + selector);
         observer.disconnect();
         reject(new Error(`Timeout waiting for element: ${selector}`));
       }, timeout);
     }
   });
+}
+
+/**
+ * Calls the provided callback function immediately and whenever the specified element or its children change.
+ *
+ * @param {Element} element - The element to observe for changes.
+ * @param {Function} callback - The function to call when the element or its children change.
+ * @param {AbortSignal} abortSignal - The signal to listen for to stop observing the element.
+ */
+function onElementChange(element, callback, abortSignal) {
+  callback(element);
+
+  const observer = new MutationObserver((mutations) => {
+    callback(element);
+  });
+  observer.observe(element, { childList: true, subtree: true });
+  console.log("Observing element: " + element);
+
+  abortSignal.addEventListener(
+    "abort",
+    () => {
+      console.log("Aborted observing element: " + element);
+      observer.disconnect();
+    },
+    { once: true }
+  );
 }
 
 try {
@@ -315,84 +366,109 @@ try {
 
 /******************************************************************************************************
  * UI Templates
- * Based on existing elements on mod.io/r/extra
- * The extra filters dialog template's structure and tailwind class soup are copied from the Report dialog
+ * Based on existing elements on mod.io, tailwind class soup included.
+ * The extra filters dialog template's structure is copied from the Report dialog
  *****************************************************************************************************/
+function openDialogBtnTemplate() {
+  return /*html*/ `
+  <div class="tw-flex tw-justify-start tw-px-5 tw-pt-4">
+    <button
+      id="${openDialogBtnId}"
+      type="button"
+      class="tw-grow tw-bg-primary tw-border-primary tw-border-2 tw-p-2 tw-global--border-radius tw-text-primary-text tw-text-md tw-font-bold"
+    >
+      ${extraFiltersBtnTxt}
+    </button>
+  </div>
+  `;
+}
+
+function dialogBodyTemplate() {
+  return /*html*/ `
+  <form method="dialog">
+    <div class="tw-flex tw-flex-col tw-space-y-4">
+      ${textInputTemplate(minDownloadsId, "number", "Minimum number of downloads")}
+      ${textareaTemplate(ignoreByNameId, "Ignore by mod name (full match)")}
+      ${textareaTemplate(ignoreByTextId, "Ignore by mod title or description (partial match)")}
+    </div>
+  </form>
+  `;
+}
 
 function dialogTemplate(props) {
   const { title, body, dialogId, openDialogBtnId } = props;
 
   return /*html*/ `
-    <dialog id="${dialogId}">
-      <div class="tw-fixed tw-z-40 tw-inset-0 tw-overflow-y-auto tw-dark">
+  <dialog id="${dialogId}">
+    <div class="tw-fixed tw-z-40 tw-inset-0 tw-overflow-y-auto tw-dark">
+      <div
+        class="tw-flex tw-h-full tw-justify-center tw-min-screenheight tw-text-center tw-text-theme tw-items-center"
+      >
+        <!-- backdrop -->
+        <div class="tw-fixed tw-inset-0 tw-transition-opacity">
+          <div class="tw-absolute tw-inset-0 tw-opacity-70 tw-bg-black"></div>
+        </div>
+        <!-- dialog content -->
         <div
-          class="tw-flex tw-h-full tw-justify-center tw-min-screenheight tw-text-center tw-text-theme tw-items-center"
+          class="tw-w-full tw-align-bottom tw-text-left tw-shadow-xl tw-transform tw-transition-all sm:tw-align-middle tw-outline-none tw-border-primary tw-bg-theme tw-inline-block tw-max-w-3xl tw-border-2 tw-flex tw-flex-col tw-mx-4 sm:tw-mx-0 sm:tw-my-12 tw-global--border-radius tw-max-h-80vh"
         >
-          <!-- backdrop -->
-          <div class="tw-fixed tw-inset-0 tw-transition-opacity">
-            <div class="tw-absolute tw-inset-0 tw-opacity-70 tw-bg-black"></div>
-          </div>
-          <!-- dialog content -->
+          <!-- dialog header -->
           <div
-            class="tw-w-full tw-align-bottom tw-text-left tw-shadow-xl tw-transform tw-transition-all sm:tw-align-middle tw-outline-none tw-border-primary tw-bg-theme tw-inline-block tw-max-w-3xl tw-border-2 tw-flex tw-flex-col tw-mx-4 sm:tw-mx-0 sm:tw-my-12 tw-global--border-radius tw-max-h-80vh"
+            class="tw-w-full tw-shadow-inner tw-z-3 tw-px-8 sm:tw-px-10 tw-py-6 tw-pl-8 tw-pr-12 tw-bg-theme-3 tw-global--border-radius-t tw-flex tw-items-center"
           >
-            <!-- dialog header -->
-            <div
-              class="tw-w-full tw-shadow-inner tw-z-3 tw-px-8 sm:tw-px-10 tw-py-6 tw-pl-8 tw-pr-12 tw-bg-theme-3 tw-global--border-radius-t tw-flex tw-items-center"
+            <div class="tw-w-full">
+              <div class="tw-flex tw-flex-row tw-justify-between lg:tw-space-x-4 tw-space-y-4 lg:tw-space-y-0">
+                <div class="tw-w-full tw-flex tw-flex-col tw-justify-center">
+                  <h2 class="tw-flex tw-leading-tight tw-justify-start tw-text-left tw-font-normal tw-text-h4">
+                    ${title}
+                  </h2>
+                </div>
+              </div>
+            </div>
+            <!-- close button -->
+            <button
+              id="${closeDialogBtnId}"
+              class="tw-absolute tw--top-9 tw-right-0 tw-flex tw-items-center tw-justify-center tw-overflow-hidden tw-button-transition tw-outline-none tw-shrink-0 tw-space-x-2 tw-font-bold hover:tw-text-primary focus:tw-text-primary tw-text-sm tw-cursor-pointer tw-input--height-small tw-input--width-small"
+              tabindex="0"
             >
-              <div class="tw-w-full">
-                <div class="tw-flex tw-flex-row tw-justify-between lg:tw-space-x-4 tw-space-y-4 lg:tw-space-y-0">
-                  <div class="tw-w-full tw-flex tw-flex-col tw-justify-center">
-                    <h2 class="tw-flex tw-leading-tight tw-justify-start tw-text-left tw-font-normal tw-text-h4">
-                      ${title}
-                    </h2>
-                  </div>
+            ${closeIconSvgTemplate()}
+              <span class="sr-only">Close modal</span>
+            </button>
+          </div>
+          <!-- dialog body scrollable wrapper -->
+          <div class="tw-mx-auto tw-py-6 tw-px-8 sm:tw-px-10 tw-overflow-auto tw-util-scrollbar tw-w-full">
+            <!-- dialog body content -->
+            <div class="tw-w-full tw-global--border-radius tw-relative tw-rounded-tr-none tw-border-transparent">
+              ${body}
+            </div>
+            <!-- dialog footer -->
+            <footer class="tw-border-theme-1 tw-py-6 tw-pb-0">
+              <div class="tw-w-full tw-flex tw-justify-between tw-items-center">
+                <div class="tw-flex tw-flex-col sm:tw-flex-row tw-items-center tw-w-full tw-gap-3">
+                  <button
+                    id="${cancelDialogBtnId}"
+                    type="button"
+                    class="tw-flex tw-items-center tw-justify-center tw-overflow-hidden tw-button-transition tw-outline-none tw-shrink-0 tw-space-x-2 tw-font-bold tw-text-md tw-leading-normal tw-global--border-radius tw-cursor-pointer tw-input--height-large tw-w-full sm:tw-w-36 tw-bg-theme-1 tw-text-theme tw-border-theme-1 hover:tw-bg-theme-2 focus:tw-bg-theme-1 hover:tw-border-theme-2 focus:tw-border-theme-2 tw-border-2"
+                    tabindex="0"
+                  >
+                    <span class="tw-transform tw-transition-transform tw-translate-x-0"> Cancel </span>
+                  </button>
+                  <button
+                    id="${saveFiltersBtnId}"
+                    type="button"
+                    class="tw-flex tw-items-center tw-justify-center tw-overflow-hidden tw-button-transition tw-outline-none tw-shrink-0 tw-space-x-2 tw-font-bold tw-text-md tw-leading-normal tw-global--border-radius tw-cursor-pointer tw-input--height-large tw-w-full sm:tw-w-36 tw-bg-primary tw-text-primary-text tw-border-primary hover:tw-bg-primary-hover focus:tw-bg-primary-hover hover:tw-border-primary-hover focus:tw-border-primary-hover tw-border-2"
+                    tabindex="0"
+                  >
+                    <span class="tw-transform tw-transition-transform tw-translate-x-0"> Save </span>
+                  </button>
                 </div>
               </div>
-              <!-- close button -->
-              <button
-                id="${closeDialogBtnId}"
-                class="tw-absolute tw--top-9 tw-right-0 tw-flex tw-items-center tw-justify-center tw-overflow-hidden tw-button-transition tw-outline-none tw-shrink-0 tw-space-x-2 tw-font-bold hover:tw-text-primary focus:tw-text-primary tw-text-sm tw-cursor-pointer tw-input--height-small tw-input--width-small"
-                tabindex="0"
-              >
-              ${closeIconSvgTemplate()}
-                <span class="sr-only">Close modal</span>
-              </button>
-            </div>
-            <!-- dialog body scrollable wrapper -->
-            <div class="tw-mx-auto tw-py-6 tw-px-8 sm:tw-px-10 tw-overflow-auto tw-util-scrollbar tw-w-full">
-              <!-- dialog body content -->
-              <div class="tw-w-full tw-global--border-radius tw-relative tw-rounded-tr-none tw-border-transparent">
-                ${body}
-              </div>
-              <!-- dialog footer -->
-              <footer class="tw-border-theme-1 tw-py-6 tw-pb-0">
-                <div class="tw-w-full tw-flex tw-justify-between tw-items-center">
-                  <div class="tw-flex tw-flex-col sm:tw-flex-row tw-items-center tw-w-full tw-gap-3">
-                    <button
-                      id="${cancelDialogBtnId}"
-                      type="button"
-                      class="tw-flex tw-items-center tw-justify-center tw-overflow-hidden tw-button-transition tw-outline-none tw-shrink-0 tw-space-x-2 tw-font-bold tw-text-md tw-leading-normal tw-global--border-radius tw-cursor-pointer tw-input--height-large tw-w-full sm:tw-w-36 tw-bg-theme-1 tw-text-theme tw-border-theme-1 hover:tw-bg-theme-2 focus:tw-bg-theme-1 hover:tw-border-theme-2 focus:tw-border-theme-2 tw-border-2"
-                      tabindex="0"
-                    >
-                      <span class="tw-transform tw-transition-transform tw-translate-x-0"> Cancel </span>
-                    </button>
-                    <button
-                      id="${saveFiltersBtnId}"
-                      type="button"
-                      class="tw-flex tw-items-center tw-justify-center tw-overflow-hidden tw-button-transition tw-outline-none tw-shrink-0 tw-space-x-2 tw-font-bold tw-text-md tw-leading-normal tw-global--border-radius tw-cursor-pointer tw-input--height-large tw-w-full sm:tw-w-36 tw-bg-primary tw-text-primary-text tw-border-primary hover:tw-bg-primary-hover focus:tw-bg-primary-hover hover:tw-border-primary-hover focus:tw-border-primary-hover tw-border-2"
-                      tabindex="0"
-                    >
-                      <span class="tw-transform tw-transition-transform tw-translate-x-0"> Save </span>
-                    </button>
-                  </div>
-                </div>
-              </footer>
-            </div>
+            </footer>
           </div>
         </div>
       </div>
-    </dialog>
+    </div>
+  </dialog>
   `;
 }
 
