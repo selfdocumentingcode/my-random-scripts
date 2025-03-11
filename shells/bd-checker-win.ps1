@@ -21,11 +21,17 @@
 # Version: 0.4
 ###################################
 
+# DEbug notes:
+# After BD patch + failure to launch due to "Inconsistent installer state" + launching with regular "Discord short"
+# Consider making the script launc "Update.exe" from root Discord folder, instead of Discord.exe
+
 $betterDiscordDownloadUrl = "https://github.com/BetterDiscord/Installer/releases/latest/download/BetterDiscord-Windows.exe";
 
 $localAppData = [Environment]::GetFolderPath("LocalApplicationData");
 $bdInstallerFileLocation = Join-Path ([System.IO.Path]::GetTempPath()) "BetterDiscord-Windows.exe";
 $discordFolder = Join-Path $localAppData "Discord";
+$updateExePath = Join-Path $discordFolder "Update.exe";
+$updateArgsPath = @("--processStart", "Discord.exe")
 
 # Find newest folder that contains a dot in its name
 $discordVersionFolder = Get-ChildItem $discordFolder
@@ -35,7 +41,7 @@ $discordVersionFolder = Get-ChildItem $discordFolder
 | Select-Object -ExpandProperty PSChildName;
 
 $discordAppFolder = Join-Path $discordFolder $discordVersionFolder;
-$discordExePath = Join-Path $discordAppFolder "Discord.exe";
+# $discordExePath = Join-Path $discordAppFolder "Discord.exe";
 $discordIndexJsFolder = Join-Path $discordAppFolder "modules/discord_desktop_core-1/discord_desktop_core";
 if (-not (Test-Path $discordIndexJsFolder)) {
     $discordIndexJsFolder = Join-Path $discordAppFolder "modules/discord_desktop_core-2/discord_desktop_core";
@@ -48,10 +54,9 @@ if (-not (Test-Path $discordIndexJsPath)) {
     Write-Output "module.exports = require('./core.asar');" | Out-File $discordIndexJsPath;
 }
 
-function LaunchInBackground($path) {
+function LaunchInBackground($path, $launchArgs) {
     Write-Host $path;
-    $res = Start-Process $path &;
-    Wait-Job -Id $res.Id
+    Wait-Job -Id (Start-Process $path -ArgumentList $launchArgs &).Id
 }
 
 function LaunchAndWait($path) {
@@ -65,6 +70,9 @@ Write-Host "Checking for BetterDiscord...";
 $betterDiscordIsInstalled = (Get-Content $discordIndexJsPath) -match "betterdiscord.asar";
 if ($betterDiscordIsInstalled) {
     Write-Host "BetterDiscord is installed!";
+
+    # Launch Discord via Update.exe
+    LaunchInBackground $updateExePath $updateArgsPath;
 }
 else {
     Write-Host "BetterDiscord is not installed!";
@@ -73,6 +81,7 @@ else {
 
     if ($install -ne "n") {
         # Check if BetterDiscord installer is already downloaded.
+        # TODO: Check age of file and redownload if older than 1 month
         if (Test-Path $bdInstallerFileLocation) {
             Write-Host "BetterDiscord installer already downloaded!";
         }
@@ -91,8 +100,8 @@ else {
 
         # Launch BetterDiscord installer and wait for it to finish
         LaunchAndWait $bdInstallerFileLocation;
+
+        # Launch Discord via Update.exe
+        LaunchInBackground $updateExePath $updateArgsPath
     }
 }
-
-# Launch discord
-LaunchInBackground $discordExePath;
