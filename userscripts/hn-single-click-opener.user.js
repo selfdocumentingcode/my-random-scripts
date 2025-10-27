@@ -8,6 +8,9 @@
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=ycombinator.com
 // @license      MIT
 // @grant        GM_openInTab
+// @downloadURL  https://raw.githubusercontent.com/selfdocumentingcode/my-random-scripts/refs/heads/main/userscripts/hn-single-click-opener.user.js
+// @supportURL   https://github.com/selfdocumentingcode/my-random-scripts
+// @homepageURL  https://github.com/selfdocumentingcode/my-random-scripts
 // ==/UserScript==
 
 (function () {

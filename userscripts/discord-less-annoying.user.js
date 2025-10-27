@@ -1,12 +1,15 @@
 // ==UserScript==
 // @name         Less annoying Discord
 // @namespace    selfdocumentingcode
-// @version      0.1
+// @version      0.2
 // @description  Turns off reply ping by default, adds reply ping toggle hotkey, hides gift nitro button.
 // @author       selfdocumentingcode@github
 // @match        https://discord.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
 // @grant        none
+// @downloadURL  https://raw.githubusercontent.com/selfdocumentingcode/my-random-scripts/refs/heads/main/userscripts/discord-less-annoying.user.js
+// @supportURL   https://github.com/selfdocumentingcode/my-random-scripts
+// @homepageURL  https://github.com/selfdocumentingcode/my-random-scripts
 // ==/UserScript==
 
 (function () {

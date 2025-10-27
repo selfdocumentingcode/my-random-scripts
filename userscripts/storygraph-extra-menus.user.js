@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         StoryGraph Extra Menus
 // @namespace    selfdocumentingcode
-// @version      0.1
+// @version      0.2
 // @description  Adds extra menus to StoryGraph pages
 // @author       selfdocumentingcode@github
 // @match        https://app.thestorygraph.com/*
@@ -9,6 +9,9 @@
 // @license      MIT
 // @noframes
 // @grant        GM_addStyle
+// @downloadURL  https://raw.githubusercontent.com/selfdocumentingcode/my-random-scripts/refs/heads/main/userscripts/storygraph-extra-menus.user.js
+// @supportURL   https://github.com/selfdocumentingcode/my-random-scripts
+// @homepageURL  https://github.com/selfdocumentingcode/my-random-scripts
 // ==/UserScript==
 ("use strict");
 

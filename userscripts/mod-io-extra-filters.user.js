@@ -2,7 +2,7 @@
 // @name        mod.io extra filters
 // @namespace   selfdocumentingcode
 // @description Adds more filters to mod.io mod list pages
-// @version     0.2
+// @version     0.3
 // @match       https://mod.io/*
 // @author      selfdocumentingcode
 // @icon        https://www.google.com/s2/favicons?sz=64&domain=mod.io
@@ -10,6 +10,9 @@
 // @noframes
 // @grant       GM_getValue
 // @grant       GM_setValue
+// @downloadURL  https://raw.githubusercontent.com/selfdocumentingcode/my-random-scripts/refs/heads/main/userscripts/mod-io-extra-filters.user.js
+// @supportURL   https://github.com/selfdocumentingcode/my-random-scripts
+// @homepageURL  https://github.com/selfdocumentingcode/my-random-scripts
 // ==/UserScript==
 ("use strict");
 
