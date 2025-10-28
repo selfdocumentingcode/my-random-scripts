@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Lobste.rs Single click opener
 // @namespace    selfdocumentingcode
-// @version      0.1
+// @version      0.2
 // @description  Adds an [l+c] link that opens the url and the comments page in new tabs in one click. Inspired by Reddit Enhancement Suite (/r/Enhancement).
 // @author       selfdocumentingcode@github
 // @match        https://lobste.rs/*
@@ -52,8 +52,8 @@
       // "active: false" opens the tab in the background
       // "insert: true" opens the tab next to the current active tab
       // https://violentmonkey.github.io/api/gm/#gm_openintab
-      GM_openInTab(commentsUrl, { active: false, insert: false });
       GM_openInTab(linkUrl, { active: false, insert: true });
+      GM_openInTab(commentsUrl, { active: false, insert: true });
     };
 
     scOpenerElContainer.appendChild(separatorSpanEl);

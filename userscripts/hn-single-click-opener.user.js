@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hacker News Single click opener
 // @namespace    selfdocumentingcode
-// @version      0.7
+// @version      0.8
 // @description  Adds an [l+c] link that opens the url and the comments page in new tabs in one click. Inspired by Reddit Enhancement Suite (/r/Enhancement).
 // @author       selfdocumentingcode@github
 // @match        https://news.ycombinator.com/*
@@ -75,11 +75,10 @@
       // "insert: true" opens the tab next to the current active tab
       // https://violentmonkey.github.io/api/gm/#gm_openintab
       if (isExternalLink) {
-        GM_openInTab(commentsUrl, { active: false, insert: false });
         GM_openInTab(linkUrl, { active: false, insert: true });
-      } else {
-        GM_openInTab(commentsUrl, { active: false, insert: true });
       }
+
+      GM_openInTab(commentsUrl, { active: false, insert: true });
     };
 
     subtextContainer.appendChild(lPlusCLink);
